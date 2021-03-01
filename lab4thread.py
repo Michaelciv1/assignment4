@@ -65,13 +65,8 @@ NUMBER_OF_WAVES = 16
 def plotStates(state_data):
     """Plots graph based on the passed data from lab2"""
     start = time.time()
-    print(state_data[0])
-    print(state_data[1])
-    print(state_data[2])
     for state in state_data:
-        plt.plot(np.arange(1,NUMBER_OF_WAVES+1), 
-        state_data[1], 
-        label=state_data[0])
+        plt.plot(np.arange(1,NUMBER_OF_WAVES+1), state[1], label=state[0])
     end = time.time()
     print(round((end-start),2),"seconds")
 
@@ -80,12 +75,10 @@ def plotStates(state_data):
     plt.title("Vaccination Data for Selected States")
     plt.legend(loc="best")
     plt.xticks(np.arange(1,NUMBER_OF_WAVES+1), rotation=90, fontsize=12)
-    #plt.show()
-
 
 def plotVaccinationRate(state_data):
     for state in state_data:
-        plt.bar(state_data[0], state_data[2], label=state_data[0])
+        plt.bar(state[0], state[2], label=state[0])
 
     plt.ylabel("% of Population Vaccinated", fontsize = 12)
     plt.xlabel("State", fontsize = 12)
