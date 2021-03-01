@@ -62,21 +62,6 @@ statesDict = {
 
 NUMBER_OF_WAVES = 16
 
-# def plotStates(state_list):
-#     """Plots graph based on the passed data from lab2"""
-#     start = time.time()
-#     for state in state_list:
-#         plt.plot(np.arange(1,NUMBER_OF_WAVES+1), getVaccineDataForState(state)[0], label=state)
-#     end = time.time()
-#     print(round((end-start),2),"seconds")
-
-#     plt.ylabel("% of Population Willing to Accept Vaccine", fontsize = 18)
-#     plt.xlabel("Wave (two week increments beginning 07/06/2020)", fontsize = 18)
-#     plt.title("Vaccination Data for Selected States")
-#     plt.legend(loc="best")
-#     plt.xticks(np.arange(1,NUMBER_OF_WAVES+1), rotation=90, fontsize=12)
-#     #plt.show()
-
 def plotStates(state_data):
     """Plots graph based on the passed data from lab2"""
     start = time.time()
@@ -97,15 +82,6 @@ def plotStates(state_data):
     plt.xticks(np.arange(1,NUMBER_OF_WAVES+1), rotation=90, fontsize=12)
     #plt.show()
 
-# def plotVaccinationRate(state_list):
-#     for state in state_list:
-#         plt.bar(state, getVaccineDataForState(state)[1], label=state)
-
-#     plt.ylabel("% of Population Vaccinated", fontsize = 12)
-#     plt.xlabel("State", fontsize = 12)
-#     plt.title("Vaccination Rate for Selected States")
-#     plt.legend(loc="best")
-#     plt.xticks(rotation=90, fontsize=12)
 
 def plotVaccinationRate(state_data):
     for state in state_data:
@@ -116,40 +92,6 @@ def plotVaccinationRate(state_data):
     plt.title("Vaccination Rate for Selected States")
     plt.legend(loc="best")
     plt.xticks(rotation=90, fontsize=12)
-
-# def getVaccineDataForState(state):
-#     acceptance_rate_list = []
-#     final_percent_vaccinated = 0
-
-#     for x in range(1,NUMBER_OF_WAVES+1):
-#         print("Wave",x)
-#         try: 
-#             response = requests.get("http://covidsurvey.mit.edu:5000/query?wave=wave" + str(x) + "&country=US&us_state=" + statesDict[state] + "&signal=vaccine_accept").text
-#             jsonData = json.loads(response)
-
-#             percent_yes = float(jsonData['vaccine_accept']['weighted']['Yes'])
-#             percent_vaccinated = 0
-#             try:
-#                 if x == NUMBER_OF_WAVES:
-#                     final_percent_vaccinated = float(jsonData['vaccine_accept']['weighted']['I have already been vaccinated'])
-#                 percent_vaccinated += float(jsonData['vaccine_accept']['weighted']['I have already been vaccinated'])
-#             except KeyError:
-#                 pass
-#             acceptance_rate = percent_yes + percent_vaccinated
-#         except KeyError:
-#             if x == 1:
-#                 print("not enough data")
-#                 break
-#             else:
-#                 acceptance_rate = 0
-#                 pass
-        
-#         acceptance_rate_list.append(acceptance_rate)
-
-#     for idx, x in enumerate(acceptance_rate_list):
-#         if x == 0:
-#             acceptance_rate_list[idx] = (acceptance_rate_list[idx-1] + acceptance_rate_list[idx + 1])/2
-#     return (acceptance_rate_list, final_percent_vaccinated)
 
 def getVaccineDataForStates(state_list):
     state_data = []
