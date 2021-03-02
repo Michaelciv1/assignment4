@@ -2,6 +2,7 @@ import requests
 import json
 import tkinter as tk
 import time
+import os
 import queue
 import threading
 import numpy as np
@@ -59,16 +60,11 @@ statesDict = {
     'West Virginia': 'WV',
     'Wisconsin': 'WI',
     'Wyoming': 'WY'
-}   
+    } 
 
-NUMBER_OF_WAVES = 16
+NUMBER_OF_WAVES = 15
 
 my_queue = queue.Queue()
-
-def storeInQueue(function):
-  def wrapper(*args):
-    my_queue.put(function(*args))
-  return wrapper
 
 def plotStates(state_data):
     for state in state_data:
@@ -90,71 +86,31 @@ def plotVaccinationRate(state_data):
     plt.legend(loc="best")
     plt.xticks(rotation=90, fontsize=12)
 
-def getVaccineDataForStates(state_list):
-    start = time.time()
-    state_data = []
-    no_data_states = []
-    for state in state_list:
-        acceptance_rate_list = []
-        final_percent_vaccinated = 0
-
-        for x in range(1,NUMBER_OF_WAVES+1):
-            print("Wave",x)
-            try: 
-                response = requests.get("http://covidsurvey.mit.edu:5000/query?wave=wave" + str(x) + "&country=US&us_state=" + statesDict[state] + "&signal=vaccine_accept").text
-                jsonData = json.loads(response)
-
-                percent_yes = float(jsonData['vaccine_accept']['weighted']['Yes'])
-                percent_vaccinated = 0
-                try:
-                    if x == NUMBER_OF_WAVES:
-                        final_percent_vaccinated = float(jsonData['vaccine_accept']['weighted']['I have already been vaccinated'])
-                    percent_vaccinated += float(jsonData['vaccine_accept']['weighted']['I have already been vaccinated'])
-                except KeyError:
-                    pass
-                acceptance_rate = percent_yes + percent_vaccinated
-            except KeyError:
-                if x == 1:
-                    no_data_states.append(state)
-                    break
-                else:
-                    acceptance_rate = 0
-                    pass
-            
-            acceptance_rate_list.append(acceptance_rate)
-
-        for idx, x in enumerate(acceptance_rate_list):
-            if x == 0:
-                acceptance_rate_list[idx] = (acceptance_rate_list[idx-1] + acceptance_rate_list[idx + 1])/2
-
-        if state not in no_data_states:
-            state_data.append((state, acceptance_rate_list, final_percent_vaccinated))
-    end = time.time()
-    print(round((end-start),2),"seconds")
-    return (state_data, no_data_states)
-
-@storeInQueue
 def getVaccineDataForState(state):
     state_data = []
     acceptance_rate_list = []
     final_percent_vaccinated = 0
 
-    for x in range(1,NUMBER_OF_WAVES+1):
-        print("Wave",x)
-        try: 
-            response = requests.get("http://covidsurvey.mit.edu:5000/query?wave=wave" + str(x) + "&country=US&us_state=" + statesDict[state] + "&signal=vaccine_accept").text
-            jsonData = json.loads(response)
+    response = requests.get(f"http://covidsurvey.mit.edu:5000/query?country=US&us_state={statesDict[state]}&signal=vaccine_accept&timeseries=true").text
+    jsonData = json.loads(response)
 
-            percent_yes = float(jsonData['vaccine_accept']['weighted']['Yes'])
+    if "all" in jsonData:
+        del jsonData["all"]
+    print("Getting data for",state)
+    for x, wave in enumerate(jsonData, 1):
+        print("Wave",x)
+        try:
+            percent_yes = float(jsonData[wave]['vaccine_accept']['weighted']['Yes'])
             percent_vaccinated = 0
             try:
-                if x == NUMBER_OF_WAVES:
-                    final_percent_vaccinated = float(jsonData['vaccine_accept']['weighted']['I have already been vaccinated'])
-                percent_vaccinated += float(jsonData['vaccine_accept']['weighted']['I have already been vaccinated'])
+                if wave == "wave"+str(NUMBER_OF_WAVES):
+                    final_percent_vaccinated = float(jsonData[wave]['vaccine_accept']['weighted']['I have already been vaccinated'])
+                percent_vaccinated += float(jsonData[wave]['vaccine_accept']['weighted']['I have already been vaccinated'])
             except KeyError:
                 pass
             acceptance_rate = percent_yes + percent_vaccinated
         except KeyError:
+            "If the first wave is missing data, I assume the rest of the data is empty as well"
             if x == 1:
                 break
             else:
@@ -165,10 +121,13 @@ def getVaccineDataForState(state):
 
     for idx, x in enumerate(acceptance_rate_list):
         if x == 0:
-            acceptance_rate_list[idx] = (acceptance_rate_list[idx-1] + acceptance_rate_list[idx + 1])/2
+            try:
+                acceptance_rate_list[idx] = (acceptance_rate_list[idx-1] + acceptance_rate_list[idx + 1])/2
+            except IndexError:
+                acceptance_rate_list[idx] = acceptance_rate_list[idx-1]
 
     state_data = (state, acceptance_rate_list, final_percent_vaccinated)
-    return (state_data)
+    my_queue.put(state_data)
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -198,6 +157,7 @@ class MainWindow(tk.Tk):
             self.listbox.insert(tk.END, state)
 
         button.config(command=self.selectedStates) #check this
+        self.protocol("WM_DELETE_WINDOW", self.quit)
 
     def selectedStates(self):
         """Sets selection to whatever user has selected in listbox"""
@@ -225,13 +185,30 @@ class MainWindow(tk.Tk):
         if states_missing_data:
             missing_states = ', '.join(states_missing_data)
             tk.messagebox.showinfo(title="Missing Data", message="No data for " + missing_states)
-        if state_data != []:
+        if state_data:
             self.Plot(plotStates, state_data)
             self.Plot(plotVaccinationRate, state_data)
+            self.saveData(state_data)
 
     def Plot(self, plot, state_data):
         pw = PlotWindow(self, plot, state_data)
+        self.wait_window(pw)
 
+    def saveData(self,state_data):
+        save_message = tk.messagebox.askokcancel(title="Save Data", message="Save result to file?")
+        if save_message:
+            current_directory = tk.filedialog.askdirectory(initialdir='.')
+            if not os.path.isdir('lab4dir') :
+                os.mkdir('lab4dir')
+            os.chdir('lab4dir')
+        #def writeFile(filename, str) :
+            with open("lab4out.txt", 'w') as fh:
+                for state in state_data: 
+                    fh.write(str(state[0]) + ":\n")
+                    fh.write("approve:"+', '.join([str(x) for x in state[1]])+"\n")
+                    fh.write("vaccinated: "+ str(state[2]) + "\n")
+
+        
 
 class PlotWindow(tk.Toplevel):
     def __init__(self, master, plot, state_data):
@@ -239,11 +216,14 @@ class PlotWindow(tk.Toplevel):
         self.title("Vaccine Data")
         self.transient(master)
 
-        fig = plt.figure(figsize=(15, 10))
+        fig = plt.figure(figsize=(10, 10))
         plot(state_data)
+        plt.tight_layout()
         canvas = FigureCanvasTkAgg(fig, master=self)
         canvas.get_tk_widget().grid()
         canvas.draw()
+        
+
 
 def main():
     m = MainWindow()

@@ -87,7 +87,7 @@ def plotVaccinationRate(state_data):
     plt.legend(loc="best")
     plt.xticks(rotation=90, fontsize=12)
 
-def getVaccineDataForState(state):
+def getVaccineDataForState(state, q):
     state_data = []
     acceptance_rate_list = []
     final_percent_vaccinated = 0
@@ -128,7 +128,7 @@ def getVaccineDataForState(state):
                 acceptance_rate_list[idx] = acceptance_rate_list[idx-1]
 
     state_data = (state, acceptance_rate_list, final_percent_vaccinated)
-    my_queue.put(state_data)
+    q.put(state_data)
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -169,21 +169,22 @@ class MainWindow(tk.Tk):
         start = time.time()
         for state in self.state_list:
             print('stop')
-            p = mp.Process(target = getVaccineDataForState, args=(state,))
+            p = mp.Process(target = getVaccineDataForState, args=(state, my_queue))
             p.start()
             processes.append(p)
+        print(processes)
 
         for process in processes:
             print('stop here')
-            # process.join()
+            process.join()
             state = my_queue.get()
-            if state[1] == [0]:
+            print(state)
+            if state[1] == []:
                 states_missing_data.append(state[0])
             else:
                 state_data.append(state)
+        print("loop finished")
         
-        for process in processes:
-            process.join()
 
         end = time.time()
         print(round((end-start),2),"seconds")
