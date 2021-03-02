@@ -63,12 +63,9 @@ statesDict = {
 NUMBER_OF_WAVES = 16
 
 def plotStates(state_data):
-    """Plots graph based on the passed data from lab2"""
-    start = time.time()
-    for state in state_data:
+    for state in state_data[0]:
         plt.plot(np.arange(1,NUMBER_OF_WAVES+1), state[1], label=state[0])
-    end = time.time()
-    print(round((end-start),2),"seconds")
+    
 
     plt.ylabel("% of Population Willing to Accept Vaccine", fontsize = 18)
     plt.xlabel("Wave (two week increments beginning 07/06/2020)", fontsize = 18)
@@ -77,7 +74,7 @@ def plotStates(state_data):
     plt.xticks(np.arange(1,NUMBER_OF_WAVES+1), rotation=90, fontsize=12)
 
 def plotVaccinationRate(state_data):
-    for state in state_data:
+    for state in state_data[0]:
         plt.bar(state[0], state[2], label=state[0])
 
     plt.ylabel("% of Population Vaccinated", fontsize = 12)
@@ -87,7 +84,9 @@ def plotVaccinationRate(state_data):
     plt.xticks(rotation=90, fontsize=12)
 
 def getVaccineDataForStates(state_list):
+    start = time.time()
     state_data = []
+    no_data_states = []
     for state in state_list:
         acceptance_rate_list = []
         final_percent_vaccinated = 0
@@ -109,7 +108,7 @@ def getVaccineDataForStates(state_list):
                 acceptance_rate = percent_yes + percent_vaccinated
             except KeyError:
                 if x == 1:
-                    print("not enough data")
+                    no_data_states.append(state)
                     break
                 else:
                     acceptance_rate = 0
@@ -121,8 +120,11 @@ def getVaccineDataForStates(state_list):
             if x == 0:
                 acceptance_rate_list[idx] = (acceptance_rate_list[idx-1] + acceptance_rate_list[idx + 1])/2
 
-        state_data.append((state, acceptance_rate_list, final_percent_vaccinated))
-    return (state_data)
+        if state not in no_data_states:
+            state_data.append((state, acceptance_rate_list, final_percent_vaccinated))
+    end = time.time()
+    print(round((end-start),2),"seconds")
+    return (state_data, no_data_states)
 
 
 class MainWindow(tk.Tk):
@@ -158,8 +160,12 @@ class MainWindow(tk.Tk):
         """Sets selection to whatever user has selected in listbox"""
         self.state_list = [self.listbox.get(idx) for idx in self.listbox.curselection()]
         state_data = getVaccineDataForStates(self.state_list)
-        self.Plot(plotStates, state_data)
-        self.Plot(plotVaccinationRate, state_data)
+        if state_data[1]:
+            missing_states = ', '.join(state_data[1])
+            tk.messagebox.showinfo(title="Missing Data", message="No data for " + missing_states)
+        if state_data[0] != []:
+            self.Plot(plotStates, state_data)
+            self.Plot(plotVaccinationRate, state_data)
 
     def Plot(self, plot, state_data):
         pw = PlotWindow(self, plot, state_data)
