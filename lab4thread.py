@@ -2,6 +2,7 @@ import requests
 import json
 import tkinter as tk
 import time
+import queue
 import threading
 import numpy as np
 from matplotlib import pyplot as plt
@@ -62,11 +63,17 @@ statesDict = {
 
 NUMBER_OF_WAVES = 16
 
+my_queue = queue.Queue()
+
+def storeInQueue(function):
+  def wrapper(*args):
+    my_queue.put(function(*args))
+  return wrapper
+
 def plotStates(state_data):
-    for state in state_data[0]:
+    for state in state_data:
         plt.plot(np.arange(1,NUMBER_OF_WAVES+1), state[1], label=state[0])
     
-
     plt.ylabel("% of Population Willing to Accept Vaccine", fontsize = 18)
     plt.xlabel("Wave (two week increments beginning 07/06/2020)", fontsize = 18)
     plt.title("Vaccination Data for Selected States")
@@ -74,7 +81,7 @@ def plotStates(state_data):
     plt.xticks(np.arange(1,NUMBER_OF_WAVES+1), rotation=90, fontsize=12)
 
 def plotVaccinationRate(state_data):
-    for state in state_data[0]:
+    for state in state_data:
         plt.bar(state[0], state[2], label=state[0])
 
     plt.ylabel("% of Population Vaccinated", fontsize = 12)
@@ -126,6 +133,42 @@ def getVaccineDataForStates(state_list):
     print(round((end-start),2),"seconds")
     return (state_data, no_data_states)
 
+@storeInQueue
+def getVaccineDataForState(state):
+    state_data = []
+    acceptance_rate_list = []
+    final_percent_vaccinated = 0
+
+    for x in range(1,NUMBER_OF_WAVES+1):
+        print("Wave",x)
+        try: 
+            response = requests.get("http://covidsurvey.mit.edu:5000/query?wave=wave" + str(x) + "&country=US&us_state=" + statesDict[state] + "&signal=vaccine_accept").text
+            jsonData = json.loads(response)
+
+            percent_yes = float(jsonData['vaccine_accept']['weighted']['Yes'])
+            percent_vaccinated = 0
+            try:
+                if x == NUMBER_OF_WAVES:
+                    final_percent_vaccinated = float(jsonData['vaccine_accept']['weighted']['I have already been vaccinated'])
+                percent_vaccinated += float(jsonData['vaccine_accept']['weighted']['I have already been vaccinated'])
+            except KeyError:
+                pass
+            acceptance_rate = percent_yes + percent_vaccinated
+        except KeyError:
+            if x == 1:
+                break
+            else:
+                acceptance_rate = 0
+                pass
+        
+        acceptance_rate_list.append(acceptance_rate)
+
+    for idx, x in enumerate(acceptance_rate_list):
+        if x == 0:
+            acceptance_rate_list[idx] = (acceptance_rate_list[idx-1] + acceptance_rate_list[idx + 1])/2
+
+    state_data = (state, acceptance_rate_list, final_percent_vaccinated)
+    return (state_data)
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -154,16 +197,35 @@ class MainWindow(tk.Tk):
         for state in statesDict.keys():
             self.listbox.insert(tk.END, state)
 
-        button.config(command=self.setSelection) #check this
+        button.config(command=self.selectedStates) #check this
 
-    def setSelection(self):
+    def selectedStates(self):
         """Sets selection to whatever user has selected in listbox"""
         self.state_list = [self.listbox.get(idx) for idx in self.listbox.curselection()]
-        state_data = getVaccineDataForStates(self.state_list)
-        if state_data[1]:
-            missing_states = ', '.join(state_data[1])
+        state_data = []
+        states_missing_data = []
+        threads = []
+        start = time.time()
+        for state in self.state_list:
+            t = threading.Thread(target = getVaccineDataForState, args=(state,))
+            t.start()
+            threads.append(t)
+
+        for thread in threads:
+            thread.join()
+            state = my_queue.get()
+            if state[1] == []:
+                states_missing_data.append(state[0])
+            else:
+                state_data.append(state)
+
+        end = time.time()
+        print(round((end-start),2),"seconds")
+        
+        if states_missing_data:
+            missing_states = ', '.join(states_missing_data)
             tk.messagebox.showinfo(title="Missing Data", message="No data for " + missing_states)
-        if state_data[0] != []:
+        if state_data != []:
             self.Plot(plotStates, state_data)
             self.Plot(plotVaccinationRate, state_data)
 
@@ -174,7 +236,7 @@ class MainWindow(tk.Tk):
 class PlotWindow(tk.Toplevel):
     def __init__(self, master, plot, state_data):
         super().__init__(master)
-        self.title("Population")
+        self.title("Vaccine Data")
         self.transient(master)
 
         fig = plt.figure(figsize=(15, 10))
@@ -186,6 +248,7 @@ class PlotWindow(tk.Toplevel):
 def main():
     m = MainWindow()
     m.mainloop()
+    
     
 
 if __name__ == '__main__':
