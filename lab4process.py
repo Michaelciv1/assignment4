@@ -68,6 +68,7 @@ NUMBER_OF_WAVES = 15
 my_queue = mp.Queue()
 
 def plotStates(state_data):
+    "Plots the vaccine acceptance data for the selected states in the main window"
     for state in state_data:
         plt.plot(np.arange(1,NUMBER_OF_WAVES+1), state[1], label=state[0])
     
@@ -78,6 +79,7 @@ def plotStates(state_data):
     plt.xticks(np.arange(1,NUMBER_OF_WAVES+1), rotation=90, fontsize=12)
 
 def plotVaccinationRate(state_data):
+    "Plots the vaccination rate for the selected states in the main window"
     for state in state_data:
         plt.bar(state[0], state[2], label=state[0])
 
@@ -88,6 +90,7 @@ def plotVaccinationRate(state_data):
     plt.xticks(rotation=90, fontsize=12)
 
 def getVaccineDataForState(state, q):
+    "Calls the API for a specific state's data and puts a tuple into the queue with the state name, acceptance rate list, and final vaccination rate"
     state_data = []
     acceptance_rate_list = []
     final_percent_vaccinated = 0
@@ -161,7 +164,7 @@ class MainWindow(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.quit)
 
     def selectedStates(self):
-        """Sets selection to whatever user has selected in listbox"""
+        """Sets selection to whatever user has selected in listbox and uses threads to handle the API calls"""
         self.state_list = [self.listbox.get(idx) for idx in self.listbox.curselection()]
         state_data = []
         states_missing_data = []
@@ -198,10 +201,12 @@ class MainWindow(tk.Tk):
             self.saveData(state_data)
 
     def Plot(self, plot, state_data):
+        "Passes plot to the PlotWindow to display"
         pw = PlotWindow(self, plot, state_data)
         self.wait_window(pw)
 
     def saveData(self,state_data):
+        """Prompts user to save data. Creates a directory and text file with the formatted data"""
         save_message = tk.messagebox.askokcancel(title="Save Data", message="Save result to file?")
         if save_message:
             current_directory = tk.filedialog.askdirectory(initialdir='.')
