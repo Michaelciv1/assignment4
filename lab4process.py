@@ -100,9 +100,7 @@ def getVaccineDataForState(state, q):
 
     if "all" in jsonData:
         del jsonData["all"]
-    print("Getting data for",state)
     for x, wave in enumerate(jsonData, 1):
-        print("Wave",x)
         try:
             percent_yes = float(jsonData[wave]['vaccine_accept']['weighted']['Yes'])
             percent_vaccinated = 0
@@ -171,22 +169,17 @@ class MainWindow(tk.Tk):
         processes = []
         start = time.time()
         for state in self.state_list:
-            print('stop')
             p = mp.Process(target = getVaccineDataForState, args=(state, my_queue))
             p.start()
             processes.append(p)
-        print(processes)
 
         for process in processes:
-            print('stop here')
             process.join()
             state = my_queue.get()
-            print(state)
             if state[1] == []:
                 states_missing_data.append(state[0])
             else:
                 state_data.append(state)
-        print("loop finished")
         
 
         end = time.time()
@@ -220,7 +213,6 @@ class MainWindow(tk.Tk):
                     fh.write("approve:"+', '.join([str(x) for x in state[1]])+"\n")
                     fh.write("vaccinated: "+ str(state[2]) + "\n")
 
-        
 
 class PlotWindow(tk.Toplevel):
     def __init__(self, master, plot, state_data):
@@ -243,3 +235,13 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+"""ANALYSIS
+The fastest method for running the API calls is with threads, followed by with processes,
+and the slowest was in sequence. The reason threads was the fastest is because of how sequential
+API calls require a lot of waiting. By running each call immediately after the start of the previous
+call, the threads are running nearly concurrently, without being parralel. The processes were
+faster than sequential but because API calls do not require much computation, utilizing additional
+cores does not result in a major performance boost. Sequential is by far the slowest method of 
+running. 
+"""
